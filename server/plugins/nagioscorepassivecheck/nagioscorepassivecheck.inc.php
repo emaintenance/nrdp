@@ -9,6 +9,7 @@
 require_once(dirname(__FILE__).'/../../config.inc.php');
 require_once(dirname(__FILE__).'/../../includes/utils.inc.php');
 
+require_once(dirname(__FILE__).'/submit_checkresults.php');
 
 register_callback(CALLBACK_PROCESS_REQUEST, 'nagioscorepassivecheck_process_request');
 
@@ -46,7 +47,7 @@ function nagioscorepassivecheck_submit_check_data()
 
     // Check results are passed as XML data
     $xmldata = grab_request_var("XMLDATA");
-    
+
     if ($debug) {
         echo "XMLDATA:<BR>";
         print_r($xmldata);
@@ -107,7 +108,8 @@ function nagioscorepassivecheck_submit_check_data()
         if (isset($cr->time) && isset($cfg["allow_old_results"])) {
             if ($cfg["allow_old_results"]) {
                 $time = intval($cr->time);
-                nrdp_write_check_output_to_ndo($hostname, $servicename, $state, $output, $type, $time);
+                //nrdp_write_check_output_to_ndo($hostname, $servicename, $state, $output, $type, $time);
+            nrdp_write_check_output_to_cmd($hostname, $servicename, $state, $output, $type);
             }
         } else {
             nrdp_write_check_output_to_cmd($hostname, $servicename, $state, $output, $type);
@@ -117,7 +119,7 @@ function nagioscorepassivecheck_submit_check_data()
     }
 
     output_api_header();
-    
+
     echo "<result>\n";
     echo "  <status>0</status>\n";
     echo "  <message>OK</message>\n";
@@ -125,7 +127,7 @@ function nagioscorepassivecheck_submit_check_data()
     echo "       <output>".$total_checks." checks processed.</output>\n";
     echo "    </meta>\n";
     echo "</result>\n";
-    
+
     exit();
 }
 
@@ -160,17 +162,20 @@ function nrdp_write_check_output_to_cmd($hostname, $servicename, $state, $output
     fprintf($fh, "exited_ok=1\n");
     fprintf($fh, "return_code=%d\n", $state);
     fprintf($fh, "output=%s\\n\n", $output);
-    
+
     // Close the file
     fclose($fh);
-    
+
     // Change ownership and perms
     chgrp($tmpname, $cfg["nagios_command_group"]);
     chmod($tmpname, 0770);
-    
+
     // Create an ok-to-go, so Nagios Core picks it up
     $fh = fopen($tmpname.".ok", "w+");
     fclose($fh);
+
+        // submit_checkresults.php
+        submit_checkresults2nagios();
 }
 
 
@@ -335,7 +340,7 @@ function nrdp_write_check_output_to_ndo($hostname, $servicename, $state, $output
             } else {
                 $logentry_type = $service_unknown_type;
             }
-        
+
         } else if ($type == "host") {
 
             $update_status_sql = "";
@@ -449,7 +454,7 @@ function nrdp_write_check_output_to_ndo($hostname, $servicename, $state, $output
             }
 
             $logentry = "HOST ALERT: $hostname;".human_readable_host_state($state).";".human_readable_state_type($state_type).";$output";
-    
+
             // Get the log id based on the current state
             $host_ok_type = 1024;
             $host_down_type = 2048;
